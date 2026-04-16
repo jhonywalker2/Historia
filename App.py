@@ -2,66 +2,66 @@ import streamlit as st
 from streamlit_drawable_canvas import st_canvas
 import numpy as np
 from PIL import Image, ImageDraw
+import time
 
-st.title("Tablero estilo Scribble")
+st.title("Scribble Animado ✏️")
 
+# Sidebar
 with st.sidebar:
-    st.subheader("Propiedades del Tablero")
+    canvas_width = st.slider("Ancho", 300, 700, 500, 50)
+    canvas_height = st.slider("Alto", 200, 600, 300, 50)
+    stroke_width = st.slider("Grosor", 1, 20, 5)
+    jitter = st.slider("Movimiento (intensidad)", 1, 10, 3)
+    speed = st.slider("Velocidad", 0.01, 0.2, 0.05)
 
-    canvas_width = st.slider("Ancho del tablero", 300, 700, 500, 50)
-    canvas_height = st.slider("Alto del tablero", 200, 600, 300, 50)
-
-    drawing_mode = st.selectbox(
-        "Herramienta de Dibujo:",
-        ("freedraw", "line", "rect", "circle", "transform", "polygon", "point"),
-    )
-
-    stroke_width = st.slider("Selecciona el ancho de línea:", 1, 30, 15)
-    stroke_color = st.color_picker("Color de trazo", "#FFFFFF")
-    bg_color = st.color_picker("Color de fondo", "#000000")
-
-# Canvas original
+# Canvas
 canvas_result = st_canvas(
-    fill_color="rgba(255, 165, 0, 0.3)",
     stroke_width=stroke_width,
-    stroke_color=stroke_color,
-    background_color=bg_color,
+    stroke_color="#FFFFFF",
+    background_color="#000000",
     height=canvas_height,
     width=canvas_width,
-    drawing_mode=drawing_mode,
-    key=f"canvas_{canvas_width}_{canvas_height}",
+    drawing_mode="freedraw",
+    key="canvas",
 )
 
-# Función para efecto scribble
-def scribble_line(points, jitter=2):
-    new_points = []
-    for x, y in points:
-        new_x = x + np.random.uniform(-jitter, jitter)
-        new_y = y + np.random.uniform(-jitter, jitter)
-        new_points.append((new_x, new_y))
-    return new_points
+# Función scribble animada
+def scribble_line(points, jitter):
+    return [
+        (
+            x + np.random.uniform(-jitter, jitter),
+            y + np.random.uniform(-jitter, jitter),
+        )
+        for x, y in points
+    ]
 
-# Procesar dibujo
+# Placeholder para animación
+frame = st.empty()
+
 if canvas_result.json_data is not None:
-    img = Image.new("RGB", (canvas_width, canvas_height), bg_color)
-    draw = ImageDraw.Draw(img)
 
+    paths = []
+
+    # Guardar paths originales
     for obj in canvas_result.json_data["objects"]:
         if obj["type"] == "path":
-            path = obj["path"]
+            pts = []
+            for p in obj["path"]:
+                if p[0] in ["M", "L"]:
+                    pts.append((p[1], p[2]))
+            if len(pts) > 1:
+                paths.append(pts)
 
-            # extraer puntos
-            points = []
-            for p in path:
-                if p[0] in ["L", "M"]:
-                    points.append((p[1], p[2]))
+    # Loop de animación
+    while True:
+        img = Image.new("RGB", (canvas_width, canvas_height), "#000000")
+        draw = ImageDraw.Draw(img)
 
-            # aplicar efecto scribble
-            scribbled = scribble_line(points, jitter=3)
+        for pts in paths:
+            for _ in range(2):  # multiplica líneas para efecto sketch
+                scribbled = scribble_line(pts, jitter)
+                draw.line(scribbled, fill="white", width=stroke_width)
 
-            # dibujar línea deformada
-            if len(scribbled) > 1:
-                draw.line(scribbled, fill=stroke_color, width=stroke_width)
+        frame.image(img)
 
-    st.subheader("Resultado Scribble")
-    st.image(img)
+        time.sleep(speed)
